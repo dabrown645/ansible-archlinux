@@ -11,8 +11,10 @@ sgdisk --clear \
 
 mkfs.fat -F32 -n EFI /dev/disk/by-partlabel/EFI
 
+printf "\n>>> Creating encrypted system disk\n"
 cryptsetup luksFormat --align-payload=8192 -s 256 -c aes-xts-plain64 /dev/disk/by-partlabel/cryptsystem
 
+printf "\n>>> Opening encrypted system disk\n"
 cryptsetup open /dev/disk/by-partlabel/cryptsystem system
 
 cryptsetup open --type plain --key-file /dev/urandom /dev/disk/by-partlabel/cryptswap swap
@@ -46,14 +48,18 @@ mount -t btrfs -o subvol=snapshots,$o_btrfs LABEL=system /mnt/.snapshots
 mkdir -p /mnt/boot/efi
 mount LABEL=EFI /mnt/boot/efi
 
-pacstrap /mnt base git ansible opensh vim
+pacstrap /mnt base git ansible openssh vim
 
 genfstab -L -p /mnt >> /mnt/etc/fstab
 
-sed -i "s+LABEL=swap+/dev/mapper/swap" /mnt/etc/fstab
+sed -i "s+LABEL=swap+/dev/mapper/swap+" /mnt/etc/fstab
 
 echo "cryptswap        /dev/disk/by-partlabel/cryptswap        /dev/urandom        swap,offset=2048,cipher=aes-xts-plain64,size=256" >> /mnt/etc/crypttab
 
+printf "\n>>>> Set roots password so you can log in after systemd-nspawn\n"
+passwd
+
+exit
 
 systemd-nspawn -bD /mnt
 
